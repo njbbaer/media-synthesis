@@ -5,7 +5,7 @@ touch ~/.no_auto_tmux
 
 # Install packages
 apt install git curl -y
-pip install ftfy regex requests tqdm jupyterlab
+pip install ftfy regex requests tqdm jupyterlab ipywidgets
 
 # Clone repository
 git clone --recursive https://github.com/crowsonkb/v-diffusion-pytorch

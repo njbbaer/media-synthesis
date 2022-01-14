@@ -7,25 +7,17 @@
 ```bash
 # Set environment variables
 export SERVER_PORT=
-export SERVER_ADDRESS=root@
+export SERVER_ADDRESS=
 
 # Copy scripts to server
-scp -r -P $SERVER_PORT ~/media-synthesis/diffusion/scripts root@$SERVER_ADDRESS:/root
+scp -r -q -P $SERVER_PORT ~/media-synthesis/diffusion/scripts/* root@$SERVER_ADDRESS:/root
 
 # Connect to server
-ssh -p $SERVER_PORT root@$SERVER_ADDRESS -L 8642:localhost:8642
+ssh -p $SERVER_PORT root@$SERVER_ADDRESS -L 9341:localhost:9341
 
 # Run setup script
 bash setup.sh
 
 # Start jupyter server
-jupyter lab --ip=127.0.0.1 --port=8642 --allow-root
-```
-
-## Operations
-
-### Download images from server
-
-```bash
-scp -r -q -P $SERVER_PORT root@$SERVER_ADDRESS:/root/diffusion/output ./
+jupyter lab --ip=127.0.0.1 --port=9341 --allow-root
 ```
