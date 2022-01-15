@@ -28,24 +28,6 @@ class DiffusionModel:
     def __init__(self, params, init=None):
         self.params = params
         self.init = init
-        self.set_step_list()
-
-    def set_step_list(self):
-        steps = int(self.params['steps'] * self.params['step_multiplier'])
-        t = torch.linspace(self.params['max_timestep'], 0, steps + 1, device='cuda')[:-1]
-        self.step_list = utils.get_spliced_ddpm_cosine_schedule(t)
-
-    # def cfg_model_fn(self, x, t):
-    #     weights = torch.tensor([1 - sum([self.params['weight']]), *[self.params['weight']]], device='cuda')
-    #     target_embeds = [clip_model.encode_text(clip.tokenize(self.params['prompt'])).float().cuda()]
-    #     n = x.shape[0]
-    #     n_conds = len(target_embeds)
-    #     x_in = x.repeat([n_conds, 1, 1, 1])
-    #     t_in = t.repeat([n_conds])
-    #     clip_embed_in = torch.cat([*target_embeds]).repeat_interleave(n, 0)
-    #     vs = model(x_in, t_in, clip_embed_in).view([n_conds, n, *x.shape[1:]])
-    #     v = vs.mul(weights[:, None, None, None, None]).sum(0)
-    #     return v
 
     def cfg_model_fn(self, x, t):
         """The CFG wrapper function."""
@@ -67,40 +49,41 @@ class DiffusionModel:
         tqdm.write(f'Step {info["i"]} of {len(self.step_list)}:')
         display.display(utils.to_pil_image(grid))
 
-    def display_image(self, outs, save=False):
-        for i, out in enumerate(outs):
+    def display(self, image, save_file=False):
+        for i, out in enumerate(image):
             pil_image = utils.to_pil_image(out)
             display.display(pil_image)
-            if save:
-                filename = f'{self.params["key"]}_{self.params["seed"]}.png'
-                pil_image.save(filename)
+            if save_file:
+                file = f'{save_file}.png'
+                pil_image.save(file)
 
-    def set_step_list(self):
-        if self.params['reverse']:
-            t = torch.linspace(0, 1, self.params['steps'] + 1, device='cuda')
-        else:
-            t = torch.linspace(1, 0, self.params['steps'] + 1, device='cuda')
-        step_list = utils.get_spliced_ddpm_cosine_schedule(t)
-        self.step_list = step_list[step_list <= self.params['max_timestep']]
+    def resize_and_center_crop(self, image):
+        fac = max(self.params['size'][0] / image.size[0], self.params['size'][1] / image.size[1])
+        image = image.resize((int(fac * image.size[0]), int(fac * image.size[1])), Image.LANCZOS)
+        return transforms.functional.center_crop(image, image.size[::-1])
 
     def run(self):
-        print(f'Performing {len(self.step_list)} steps at {self.params["size"]}')
-
-        self.set_step_list()
-
         gc.collect()
         torch.cuda.empty_cache()
         torch.manual_seed(self.params['seed'])
 
-        if self.params['use_init']:
+        range = (0, 1) if self.params['reverse'] else (1, 0)
+        t = torch.linspace(*range, self.params['steps'] + 1, device='cuda')
+        step_list = utils.get_spliced_ddpm_cosine_schedule(t)
+        self.step_list = step_list[step_list <= self.params['max_timestep']]
+
+        if self.init is not None:
             x = self.init
+        elif self.params['load_file'] is not None:
+            x = Image.open(self.params['load_file'] + '.png').convert('RGB')
+            x = self.resize_and_center_crop(x)
+            x = utils.from_pil_image(x).to('cuda')[None]
         else:
             x = torch.randn((1, 3) + self.params['size'], device='cuda')
 
         if self.params['scale']:
             size = [s * 2 for s in self.params['size']]
             x = transforms.Resize(size)(x)
-            self.display_image(x)
 
         if self.params['reverse']:
             zero_embed = torch.zeros([1, clip_model.visual.output_dim], device='cuda')
@@ -109,5 +92,5 @@ class DiffusionModel:
             self.target_embed = clip_model.encode_text(clip.tokenize(self.params['prompt'])).float().cuda()
             output = sampling.sample(self.cfg_model_fn, x, self.step_list, self.params['eta'], {}, callback=self.display_callback)
 
-        self.display_image(output, self.params['save'])
+        self.display(output, self.params["save_file"])
         return output
