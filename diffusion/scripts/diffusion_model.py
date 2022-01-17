@@ -49,12 +49,12 @@ class DiffusionModel:
         tqdm.write(f'Step {info["i"]} of {len(self.step_list)}:')
         display.display(utils.to_pil_image(grid))
 
-    def display(self, image, save_file=False):
+    def display(self, image, save_name=None):
         for i, out in enumerate(image):
             pil_image = utils.to_pil_image(out)
             display.display(pil_image)
-            if save_file:
-                file = f'{save_file}.png'
+            if save_name:
+                file = f'{save_name}.png'
                 pil_image.save(file)
 
     def resize_and_center_crop(self, image):
@@ -74,16 +74,22 @@ class DiffusionModel:
 
         if self.init is not None:
             x = self.init
-        elif self.params['load_file'] is not None:
-            x = Image.open(self.params['load_file'] + '.png').convert('RGB')
+        elif self.params['load_name'] is not None:
+            x = Image.open(self.params['load_name'] + '.png').convert('RGB')
             x = self.resize_and_center_crop(x)
             x = utils.from_pil_image(x).to('cuda')[None]
         else:
             x = torch.randn((1, 3) + self.params['size'], device='cuda')
 
         if self.params['scale']:
-            size = [s * 2 for s in self.params['size']]
+            size = [s * self.params['scale'] for s in self.params['size']]
             x = transforms.Resize(size)(x)
+            self.display(x)
+
+        if self.params['renoise']:
+            rand_x = torch.randn([1, 3] + size, device='cuda')
+            alpha, sigma = utils.t_to_alpha_sigma(self.step_list[0])
+            x = x * alpha + rand_x * sigma * self.params['renoise']
 
         if self.params['reverse']:
             zero_embed = torch.zeros([1, clip_model.visual.output_dim], device='cuda')
@@ -92,5 +98,5 @@ class DiffusionModel:
             self.target_embed = clip_model.encode_text(clip.tokenize(self.params['prompt'])).float().cuda()
             output = sampling.sample(self.cfg_model_fn, x, self.step_list, self.params['eta'], {}, callback=self.display_callback)
 
-        self.display(output, self.params["save_file"])
+        self.display(output, self.params["save_name"])
         return output
