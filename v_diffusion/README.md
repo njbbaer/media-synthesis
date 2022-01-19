@@ -27,7 +27,7 @@ bash setup.sh
 Start jupyter server
 
 ```bash
-nohup jupyter lab --ip=127.0.0.1 --port=9341 --allow-root &
+nohup jupyter lab --ip=127.0.0.1 --port=9342 --allow-root &
 ```
 
 Print server URL and copy to VSCode
@@ -41,5 +41,5 @@ Close SSH connection
 Open permenant SSH tunnel
 
 ```bash
-autossh -M 0 -f -q -N -L 9341:localhost:9341 root@$SERVER_ADDRESS -p $SERVER_PORT
+autossh -M 0 -f -q -N -L 9342:localhost:9342 root@$SERVER_ADDRESS -p $SERVER_PORT
 ```
