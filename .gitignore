@@ -1,2 +1,2 @@
-diffusion/examples/temp
-.vscode
+.vscode/
+.DS_Store
